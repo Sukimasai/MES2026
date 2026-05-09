@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibration Monitoring Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+
+    <div class="container w-full mx-auto pt-6 max-w-6xl">
+        <div class="w-full px-4 md:px-0 md:mt-8 text-gray-800 leading-normal">
+            
+            <h1 class="text-3xl font-bold mb-6 text-gray-800">Vibration Data Dashboard</h1>
+
+            <div class="flex flex-wrap mb-6">
+                <div class="w-full md:w-1/3 xl:w-1/3 p-3 text-center mx-auto">
+                    <div class="bg-white border rounded shadow p-4">
+                        <div class="flex flex-row items-center">
+                            <div class="flex-shrink pl-1 pr-4"></div>
+                            <div class="flex-1 text-center">
+                                <h5 class="font-bold uppercase text-gray-500 text-sm">Avg Vibration (Last Minute)</h5>
+                                <h3 class="font-bold text-4xl text-blue-600 mt-2 transition-all duration-300">
+                                    <span id="currentVibration">0.00</span> <span class="text-lg text-gray-500">mm/s</span>
+                                </h3>
+                                <p class="text-xs text-gray-400 mt-3 transition-colors duration-300" id="lastUpdated">Waiting for data...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full p-3">
+                <div class="bg-white border rounded shadow p-4">
+                    <div class="border-b border-gray-200 mb-4 pb-2 flex justify-between items-center">
+                        <h5 class="font-bold uppercase text-gray-600">Vibration History</h5>
+                        <div class="flex space-x-4">
+                            <button class="tab-btn active text-blue-600 pb-1 hover:text-blue-600 text-sm focus:outline-none" onclick="updateChart(10, event)">10 Minutes</button>
+                            <button class="tab-btn pb-1 hover:text-blue-600 text-sm focus:outline-none" onclick="updateChart(30, event)">30 Minutes</button>
+                            <button class="tab-btn pb-1 hover:text-blue-600 text-sm focus:outline-none" onclick="updateChart(60, event)">60 Minutes</button>
+                        </div>
+                    </div>
+                    <div class="w-full h-80">
+                        <canvas id="vibrationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
