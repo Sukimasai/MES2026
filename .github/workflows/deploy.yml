@@ -1,0 +1,48 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Inject Firebase Config
+        run: |
+          cat <<EOF > firebase-config.js
+          const firebaseConfig = {
+            apiKey: "${{ secrets.FIREBASE_API_KEY }}",
+            authDomain: "mes2026.firebaseapp.com",
+            databaseURL: "https://mes2026-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "mes2026",
+            storageBucket: "mes2026.firebasestorage.app",
+            messagingSenderId: "812607570506",
+            appId: "1:812607570506:web:e4afb8ca4f130c1d3c5cb3"
+          };
+          firebase.initializeApp(firebaseConfig);
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

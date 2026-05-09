@@ -1,14 +1,3 @@
-const firebaseConfig = {
-  apiKey: "AIzaSyBq564zVF__eRbez_opkHwxAGKhGsT4i64",
-  authDomain: "mes2026.firebaseapp.com",
-  databaseURL: "https://mes2026-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "mes2026",
-  storageBucket: "mes2026.firebasestorage.app",
-  messagingSenderId: "812607570506",
-  appId: "1:812607570506:web:e4afb8ca4f130c1d3c5cb3"
-};
-
-firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
 const ctx = document.getElementById('vibrationChart').getContext('2d');
