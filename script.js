@@ -85,17 +85,13 @@ function checkDataStatus() {
     const timeSinceLastData = now - latestPoint.timestamp;
 
     if (timeSinceLastData > 3 * 60 * 1000) {
-        document.getElementById('currentVibration').innerText = "No Data";
+        document.getElementById('currentVibration').innerText = "Offline";
         document.getElementById('currentVibration').classList.remove('text-blue-600', 'text-4xl');
         document.getElementById('currentVibration').classList.add('text-red-500', 'text-2xl');
         
-        document.getElementById('lastUpdated').innerText = "Arduino Offline (No data > 3 mins)";
+        const lastSeenTime = new Date(latestPoint.timestamp).toLocaleTimeString();
+        document.getElementById('lastUpdated').innerText = `Arduino Offline (Last seen: ${lastSeenTime})`;
         document.getElementById('lastUpdated').classList.add('text-red-500');
-
-        vibrationChart.data.labels = [];
-        vibrationChart.data.datasets[0].data = [];
-        vibrationChart.update();
-        return;
     }
 
     renderChart(currentMinuteLimit);
