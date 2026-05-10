@@ -1,5 +1,57 @@
 const database = firebase.database();
 
+const clusterColors = [
+    { fill: 'rgba(59, 130, 246, 0.14)', stroke: 'rgba(59, 130, 246, 0.55)', label: 'Cluster 0' },
+    { fill: 'rgba(168, 85, 247, 0.14)', stroke: 'rgba(168, 85, 247, 0.55)', label: 'Cluster 1' },
+    { fill: 'rgba(34, 197, 94, 0.14)', stroke: 'rgba(34, 197, 94, 0.55)', label: 'Cluster 2' }
+];
+
+const clusterRangePlugin = {
+    id: 'clusterRangePlugin',
+    beforeDatasetsDraw(chart) {
+        const clusterEntries = Object.values(clusterData)
+            .filter(cluster => cluster && typeof cluster.lower_bound === 'number' && typeof cluster.upper_bound === 'number')
+            .sort((left, right) => left.lower_bound - right.lower_bound);
+
+        if (clusterEntries.length === 0) {
+            return;
+        }
+
+        const { ctx, chartArea, scales } = chart;
+        const yScale = scales.y;
+
+        ctx.save();
+
+        clusterEntries.forEach((cluster, index) => {
+            const palette = clusterColors[index % clusterColors.length];
+            const topPixel = yScale.getPixelForValue(cluster.upper_bound);
+            const bottomPixel = yScale.getPixelForValue(cluster.lower_bound);
+            const bandTop = Math.min(topPixel, bottomPixel);
+            const bandHeight = Math.max(2, Math.abs(bottomPixel - topPixel));
+
+            ctx.fillStyle = palette.fill;
+            ctx.fillRect(chartArea.left, bandTop, chartArea.right - chartArea.left, bandHeight);
+
+            ctx.strokeStyle = palette.stroke;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([6, 4]);
+            ctx.strokeRect(chartArea.left, bandTop, chartArea.right - chartArea.left, bandHeight);
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = palette.stroke;
+            ctx.font = '12px sans-serif';
+            ctx.textBaseline = 'top';
+            ctx.fillText(
+                `${palette.label}: ${cluster.lower_bound.toFixed(2)} - ${cluster.upper_bound.toFixed(2)} mm/s`,
+                chartArea.left + 10,
+                Math.min(bandTop + 8, chartArea.bottom - 18)
+            );
+        });
+
+        ctx.restore();
+    }
+};
+
 const ctx = document.getElementById('vibrationChart').getContext('2d');
 let vibrationChart = new Chart(ctx, {
     type: 'line',
@@ -24,7 +76,8 @@ let vibrationChart = new Chart(ctx, {
                 title: { display: true, text: 'Vibration (mm/s)' }
             }
         }
-    }
+    },
+    plugins: [clusterRangePlugin]
 });
 
 // Cluster storage
@@ -57,6 +110,9 @@ clusterRef.on('value', (snapshot) => {
         clusterData[clusterId] = childSnapshot.val();
     });
     displayClusters();
+    if (fullHistoryData.length > 0) {
+        renderChart(currentMinuteLimit);
+    }
 });
 
 function displayClusters() {
@@ -203,6 +259,39 @@ function calculateBounds() {
     document.getElementById('upperBound').innerText = adjustedMax.toFixed(2);
 }
 
+function getClusterUpperRange() {
+    const upperBounds = Object.values(clusterData)
+        .map(cluster => cluster && Number(cluster.upper_bound))
+        .filter(value => Number.isFinite(value));
+
+    if (upperBounds.length === 0) {
+        return null;
+    }
+
+    return Math.max(...upperBounds);
+}
+
+function updateLastAnomaly() {
+    const highestClusterUpper = getClusterUpperRange();
+    if (highestClusterUpper === null) {
+        document.getElementById('lastAnomalyValue').innerText = '--';
+        document.getElementById('lastAnomalyTime').innerText = '--:--:--';
+        return;
+    }
+
+    // find the most recent reading above the highest cluster upper bound
+    const anomalies = fullHistoryData.filter(d => Number(d.value) > highestClusterUpper);
+    if (anomalies.length === 0) {
+        document.getElementById('lastAnomalyValue').innerText = '--';
+        document.getElementById('lastAnomalyTime').innerText = '--:--:--';
+        return;
+    }
+
+    const last = anomalies[anomalies.length - 1];
+    document.getElementById('lastAnomalyValue').innerText = Number(last.value).toFixed(3);
+    document.getElementById('lastAnomalyTime').innerText = new Date(last.timestamp).toLocaleTimeString();
+}
+
 function updateDeviceStatus(isOnline) {
     const badge = document.getElementById('statusBadge');
     if (isOnline) {
@@ -278,12 +367,31 @@ function renderChart(minuteLimit) {
         labels.push(timeString);
         values.push(point.value);
     });
-
     vibrationChart.data.labels = labels;
     vibrationChart.data.datasets[0].data = values;
+
+    // color points red if they exceed the highest cluster upper bound
+    const highestClusterUpper = getClusterUpperRange();
+    const defaultPointColor = 'rgba(59,130,246,1)';
+    const anomalyPointColor = 'rgba(220,38,38,1)';
+
+    const pointColors = values.map(v => {
+        return (highestClusterUpper !== null && v > highestClusterUpper) ? anomalyPointColor : defaultPointColor;
+    });
+
+    const pointRadii = values.map(v => (highestClusterUpper !== null && v > highestClusterUpper) ? 6 : 3);
+
+    vibrationChart.data.datasets[0].pointBackgroundColor = pointColors;
+    vibrationChart.data.datasets[0].pointRadius = pointRadii;
+
+    const highestPoint = values.length > 0 ? Math.max(...values) : 0;
+    const suggestedMaximum = Math.max(highestPoint, highestClusterUpper ?? 0);
+
+    vibrationChart.options.scales.y.suggestedMax = suggestedMaximum > 0 ? suggestedMaximum * 1.15 : 1;
     vibrationChart.update();
     
     calculatePeriodStatistics(minuteLimit);
+    updateLastAnomaly();
 }
 
 window.updateChart = function(minutes, event) {
