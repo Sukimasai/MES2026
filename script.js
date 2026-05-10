@@ -27,21 +27,84 @@ let vibrationChart = new Chart(ctx, {
     }
 });
 
+// Cluster storage
+let clusterData = {};
+let recentReadings = [];
+
 const vibrationRef = database.ref('/AverageVibration');
 vibrationRef.on('value', (snapshot) => {
     const data = snapshot.val();
     if (data !== null) {
-        document.getElementById('currentVibration').innerText = parseFloat(data).toFixed(2);
+        const vibValue = parseFloat(data);
+        document.getElementById('currentVibration').innerText = vibValue.toFixed(2);
+        document.getElementById('lastReading').innerText = vibValue.toFixed(2);
+        
         const now = new Date();
-        document.getElementById('lastUpdated').innerText = `Last updated: ${now.toLocaleTimeString()}`;
+        document.getElementById('statusTime').innerText = now.toLocaleTimeString();
         document.getElementById('currentVibration').classList.remove('text-red-500', 'text-2xl');
-        document.getElementById('currentVibration').classList.add('text-blue-600', 'text-4xl');
-        document.getElementById('lastUpdated').classList.remove('text-red-500');
+        document.getElementById('currentVibration').classList.add('text-blue-600', 'text-3xl');
+        
+        updateDeviceStatus(true);
     }
 });
 
+// Listen for cluster data
+const clusterRef = database.ref('/ClusterData');
+clusterRef.on('value', (snapshot) => {
+    clusterData = {};
+    snapshot.forEach((childSnapshot) => {
+        const clusterId = childSnapshot.key;
+        clusterData[clusterId] = childSnapshot.val();
+    });
+    displayClusters();
+});
+
+function displayClusters() {
+    const container = document.getElementById('clusterContainer');
+    
+    if (Object.keys(clusterData).length === 0) {
+        container.innerHTML = '<div class="flex items-center justify-center h-40 col-span-full text-gray-400"><p class="text-center"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br><span>Loading cluster data...</span></p></div>';
+        return;
+    }
+    
+    let html = '';
+    const clusterColors = [
+        { gradient: 'from-blue-50 to-blue-100', border: 'border-blue-400', text: 'text-blue-700', badge: 'bg-blue-500' },
+        { gradient: 'from-purple-50 to-purple-100', border: 'border-purple-400', text: 'text-purple-700', badge: 'bg-purple-500' },
+        { gradient: 'from-cyan-50 to-cyan-100', border: 'border-cyan-400', text: 'text-cyan-700', badge: 'bg-cyan-500' }
+    ];
+    
+    Object.keys(clusterData).sort().forEach((key, index) => {
+        const cluster = clusterData[key];
+        const color = clusterColors[index % clusterColors.length];
+        const clusterNum = key.replace('cluster_', '');
+        
+        html += `
+            <div class="cluster-card bg-gradient-to-br ${color.gradient} rounded-xl p-6 border-2 ${color.border} hover:shadow-lg transition">
+                <div class="flex justify-between items-start mb-4">
+                    <span class="inline-block ${color.badge} text-white text-xs font-bold px-3 py-1 rounded-full">Cluster ${clusterNum}</span>
+                    <i class="fas fa-cube ${color.text} opacity-40"></i>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <p class="text-xs text-gray-600 uppercase font-semibold tracking-wide">Centroid</p>
+                        <p class="text-3xl font-bold ${color.text}">${cluster.centroid.toFixed(3)}</p>
+                    </div>
+                    <div class="pt-3 border-t border-gray-300">
+                        <p class="text-xs text-gray-600 mb-2">Radius: <span class="font-semibold">${cluster.radius.toFixed(3)}</span></p>
+                        <p class="text-xs text-gray-600">Range: <span class="font-semibold">${cluster.lower_bound.toFixed(3)} - ${cluster.upper_bound.toFixed(3)}</span></p>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
 let fullHistoryData = [];
 let currentMinuteLimit = 30;
+let boundsCalculated = { min: null, max: null };
 
 function getTimestampFromPushId(pushId) {
     const PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
@@ -55,16 +118,101 @@ function getTimestampFromPushId(pushId) {
 const historyRef = database.ref('/VibrationHistory').limitToLast(120);
 historyRef.on('value', (snapshot) => {
     fullHistoryData = [];
+    recentReadings = [];
+    
     snapshot.forEach((childSnapshot) => {
         const val = childSnapshot.val();
         const timestamp = getTimestampFromPushId(childSnapshot.key);
-        const value = typeof val === 'object' ? val.value : val; 
+        const value = typeof val === 'object' ? val.value : val;
+        const cluster = typeof val === 'object' ? val.cluster : null;
         
-        fullHistoryData.push({ timestamp, value });
+        fullHistoryData.push({ timestamp, value, cluster });
+        recentReadings.push({ timestamp, value, cluster, key: childSnapshot.key });
     });
     
+    calculateBounds();
+    updateReadingsTable();
     checkDataStatus(); 
 });
+
+function updateReadingsTable() {
+    const tbody = document.getElementById('readingsTableBody');
+    
+    // Show last 10 readings in reverse order (newest first)
+    const latestReadings = recentReadings.slice().reverse().slice(0, 10);
+    
+    if (latestReadings.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-400"><i class="fas fa-inbox mr-2"></i>No data available</td></tr>';
+        return;
+    }
+    
+    let html = '';
+    latestReadings.forEach((reading, idx) => {
+        const date = new Date(reading.timestamp);
+        const timeStr = date.toLocaleTimeString();
+        const clusterNum = reading.cluster !== null ? reading.cluster : '--';
+        
+        const clusterBounds = clusterData[`cluster_${reading.cluster}`];
+        let status = 'Unknown';
+        let statusBg = 'bg-gray-100 text-gray-700';
+        let statusIcon = 'fa-question';
+        
+        if (clusterBounds) {
+            if (reading.value >= clusterBounds.lower_bound && reading.value <= clusterBounds.upper_bound) {
+                status = 'Normal';
+                statusBg = 'bg-green-100 text-green-700';
+                statusIcon = 'fa-check-circle';
+            } else {
+                status = 'Anomaly';
+                statusBg = 'bg-red-100 text-red-700';
+                statusIcon = 'fa-exclamation-circle';
+            }
+        }
+        
+        const clusterBadgeColor = reading.cluster === 0 ? 'bg-blue-100 text-blue-700' : reading.cluster === 1 ? 'bg-purple-100 text-purple-700' : 'bg-cyan-100 text-cyan-700';
+        
+        html += `
+            <tr class="border-b border-gray-200 hover:bg-gray-50 transition">
+                <td class="px-6 py-4 text-sm font-medium text-gray-700">${timeStr}</td>
+                <td class="px-6 py-4 text-sm font-bold text-blue-600">${reading.value.toFixed(3)}</td>
+                <td class="px-6 py-4"><span class="px-3 py-1 rounded-full text-xs font-semibold ${clusterBadgeColor}">Cluster ${clusterNum}</span></td>
+                <td class="px-6 py-4"><span class="px-3 py-1 rounded-full text-xs font-semibold ${statusBg}"><i class="fas ${statusIcon} mr-1"></i>${status}</span></td>
+            </tr>
+        `;
+    });
+    
+    tbody.innerHTML = html;
+}
+
+function calculateBounds() {
+    if (fullHistoryData.length === 0) return;
+
+    const values = fullHistoryData.map(d => d.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    
+    boundsCalculated.min = min;
+    boundsCalculated.max = max;
+    
+    // Display bounds with 20% margin
+    const margin = (max - min) * 0.2;
+    const adjustedMin = Math.max(0, min - margin);
+    const adjustedMax = max + margin;
+    
+    document.getElementById('lowerBound').innerText = adjustedMin.toFixed(2);
+    document.getElementById('upperBound').innerText = adjustedMax.toFixed(2);
+}
+
+function updateDeviceStatus(isOnline) {
+    const badge = document.getElementById('statusBadge');
+    if (isOnline) {
+        badge.className = 'inline-block px-3 py-1 rounded-full text-white bg-green-500 text-sm';
+        badge.innerText = '🟢 Online';
+    } else {
+        badge.className = 'inline-block px-3 py-1 rounded-full text-white bg-red-500 text-sm';
+        badge.innerText = '🔴 Offline';
+    }
+}
 
 function checkDataStatus() {
     if (fullHistoryData.length === 0) return;
@@ -74,19 +222,41 @@ function checkDataStatus() {
     const timeSinceLastData = now - latestPoint.timestamp;
 
     if (timeSinceLastData > 3 * 60 * 1000) {
+        updateDeviceStatus(false);
         document.getElementById('currentVibration').innerText = "Offline";
-        document.getElementById('currentVibration').classList.remove('text-blue-600', 'text-4xl');
+        document.getElementById('currentVibration').classList.remove('text-blue-600', 'text-3xl');
         document.getElementById('currentVibration').classList.add('text-red-500', 'text-2xl');
-        
-        const lastSeenTime = new Date(latestPoint.timestamp).toLocaleTimeString();
-        document.getElementById('lastUpdated').innerText = `Arduino Offline (Last seen: ${lastSeenTime})`;
-        document.getElementById('lastUpdated').classList.add('text-red-500');
+    } else {
+        updateDeviceStatus(true);
     }
 
     renderChart(currentMinuteLimit);
 }
 
 setInterval(checkDataStatus, 5000);
+
+function calculatePeriodStatistics(minuteLimit) {
+    const now = Date.now();
+    const cutoffTime = now - (minuteLimit * 60 * 1000);
+
+    const dataInPeriod = fullHistoryData.filter(point => point.timestamp >= cutoffTime);
+    
+    if (dataInPeriod.length === 0) {
+        document.getElementById('periodAverage').innerText = '--';
+        document.getElementById('minVibration').innerText = '--';
+        document.getElementById('maxVibration').innerText = '--';
+        return;
+    }
+
+    const values = dataInPeriod.map(d => d.value);
+    const average = values.reduce((a, b) => a + b, 0) / values.length;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+
+    document.getElementById('periodAverage').innerText = average.toFixed(2);
+    document.getElementById('minVibration').innerText = min.toFixed(2);
+    document.getElementById('maxVibration').innerText = max.toFixed(2);
+}
 
 function renderChart(minuteLimit) {
     currentMinuteLimit = minuteLimit;
@@ -112,6 +282,8 @@ function renderChart(minuteLimit) {
     vibrationChart.data.labels = labels;
     vibrationChart.data.datasets[0].data = values;
     vibrationChart.update();
+    
+    calculatePeriodStatistics(minuteLimit);
 }
 
 window.updateChart = function(minutes, event) {

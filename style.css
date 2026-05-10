@@ -1,5 +1,68 @@
 .tab-btn.active {
-    border-bottom: 2px solid #3b82f6;
-    color: #3b82f6;
-    font-weight: 600;
+    background-color: rgb(219, 234, 254);
+    color: rgb(37, 99, 235);
+    border-bottom: 3px solid rgb(59, 130, 246);
+    font-weight: 700;
+}
+
+.tab-btn {
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover {
+    background-color: rgb(243, 244, 246);
+    transform: translateY(-2px);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Table styling */
+tbody tr {
+    border-bottom: 1px solid rgb(229, 231, 235);
+    transition: background-color 0.2s ease;
+}
+
+tbody tr:hover {
+    background-color: rgb(249, 250, 251);
+}
+
+/* Status badge animations */
+@keyframes pulse-status {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-pulse {
+    animation: pulse-status 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Chart container */
+#vibrationChart {
+    max-height: 400px;
+}
+
+/* Cluster cards */
+.cluster-card {
+    transition: all 0.3s ease;
+}
+
+.cluster-card:hover {
+    transform: translateY(-4px);
+}
+
+/* Smooth text transitions */
+span {
+    transition: color 0.3s ease, opacity 0.3s ease;
 }

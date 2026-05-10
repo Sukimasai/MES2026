@@ -8,49 +8,176 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-100 font-sans leading-normal tracking-normal">
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen font-sans">
 
-    <div class="container w-full mx-auto pt-6 max-w-6xl">
-        <div class="w-full px-4 md:px-0 md:mt-8 text-gray-800 leading-normal">
-            
-            <h1 class="text-3xl font-bold mb-6 text-gray-800">Vibration Data Dashboard</h1>
-
-            <div class="flex flex-wrap mb-6">i
-                <div class="w-full md:w-1/3 xl:w-1/3 p-3 text-center mx-auto">
-                    <div class="bg-white border rounded shadow p-4">
-                        <div class="flex flex-row items-center">
-                            <div class="flex-shrink pl-1 pr-4"></div>
-                            <div class="flex-1 text-center">
-                                <h5 class="font-bold uppercase text-gray-500 text-sm">Avg Vibration (Last Minute)</h5>
-                                <h3 class="font-bold text-4xl text-blue-600 mt-2 transition-all duration-300">
-                                    <span id="currentVibration">0.00</span> <span class="text-lg text-gray-500">mm/s</span>
-                                </h3>
-                                <p class="text-xs text-gray-400 mt-3 transition-colors duration-300" id="lastUpdated">Waiting for data...</p>
-                            </div>
-                        </div>
-                    </div>
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 via-blue-700 to-purple-800 shadow-2xl">
+        <div class="container mx-auto px-4 py-8">
+            <div class="flex items-center gap-4">
+                <div class="bg-white bg-opacity-20 p-3 rounded-lg backdrop-blur-sm">
+                    <i class="fas fa-wave-square text-white text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-4xl font-bold text-white">Vibration Monitor</h1>
+                    <p class="text-blue-100 text-sm mt-1">Real-time IoT Monitoring System</p>
                 </div>
             </div>
-
-            <div class="w-full p-3">
-                <div class="bg-white border rounded shadow p-3.5">
-                    <div class="border-b border-gray-200 mb-4 pb-2 flex justify-between items-center">
-                        <h5 class="font-bold uppercase text-gray-600">Vibration History</h5>
-                        <div class="flex space-x-4">
-                            <button class="tab-btn active text-blue-600 pb-1 hover:text-blue-600 text-sm focus:outline-none" onclick="updateChart(10, event)">10 Minutes</button>
-                            <button class="tab-btn pb-1 hover:text-blue-600 text-sm focus:outline-none" onclick="updateChart(30, event)">30 Minutes</button>
-                            <button class="tab-btn pb-1 hover:text-blue-600 text-sm focus:outline-none" onclick="updateChart(60, event)">60 Minutes</button>
-                        </div>
-                    </div>
-                    <div class="w-full h-80">
-                        <canvas id="vibrationChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
         </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Current Vibration Card -->
+            <div class="group">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl p-6 text-white h-full transform transition hover:scale-105 hover:shadow-2xl cursor-default">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-blue-100 text-sm uppercase tracking-wider font-semibold">Current Avg</p>
+                            <h3 class="text-5xl font-bold mt-2"><span id="currentVibration">0.00</span></h3>
+                        </div>
+                        <i class="fas fa-gauge-high text-3xl text-blue-200 opacity-50"></i>
+                    </div>
+                    <p class="text-blue-100 text-xs">mm/s</p>
+                </div>
+            </div>
+
+            <!-- Last Reading Card -->
+            <div class="group">
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-xl p-6 text-white h-full transform transition hover:scale-105 hover:shadow-2xl cursor-default">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-purple-100 text-sm uppercase tracking-wider font-semibold">Last Reading</p>
+                            <h3 class="text-5xl font-bold mt-2"><span id="lastReading">0.00</span></h3>
+                        </div>
+                        <i class="fas fa-circle-dot text-3xl text-purple-200 opacity-50"></i>
+                    </div>
+                    <p class="text-purple-100 text-xs">mm/s</p>
+                </div>
+            </div>
+
+            <!-- Average Card -->
+            <div class="group">
+                <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-xl p-6 text-white h-full transform transition hover:scale-105 hover:shadow-2xl cursor-default">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <p class="text-green-100 text-sm uppercase tracking-wider font-semibold">Period Avg</p>
+                            <h3 class="text-5xl font-bold mt-2"><span id="periodAverage">0.00</span></h3>
+                        </div>
+                        <i class="fas fa-chart-line text-3xl text-green-200 opacity-50"></i>
+                    </div>
+                    <p class="text-green-100 text-xs">mm/s</p>
+                </div>
+            </div>
+
+            <!-- Status Card -->
+            <div class="group">
+                <div class="bg-gradient-to-br from-slate-700 to-slate-800 rounded-2xl shadow-xl p-6 text-white h-full transform transition hover:scale-105 hover:shadow-2xl cursor-default">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-slate-300 text-sm uppercase tracking-wider font-semibold">Status</p>
+                            <h3 class="text-2xl font-bold mt-4" id="deviceStatus">
+                                <span id="statusBadge" class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-white bg-gray-600 text-sm font-semibold">
+                                    <i class="fas fa-circle text-xs animate-pulse"></i>
+                                    Checking...
+                                </span>
+                            </h3>
+                        </div>
+                        <i class="fas fa-server text-3xl text-slate-400 opacity-50"></i>
+                    </div>
+                    <p class="text-slate-300 text-xs mt-4" id="statusTime">--:--:--</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <div class="border-b border-gray-200 mb-6 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h5 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fas fa-chart-area text-blue-600"></i>
+                    Vibration History
+                </h5>
+                <div class="flex space-x-3">
+                    <button class="tab-btn active px-4 py-2 rounded-lg text-sm font-semibold transition bg-blue-100 text-blue-600" onclick="updateChart(10, event)">10 Min</button>
+                    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition hover:bg-gray-100 text-gray-600" onclick="updateChart(30, event)">30 Min</button>
+                    <button class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold transition hover:bg-gray-100 text-gray-600" onclick="updateChart(60, event)">60 Min</button>
+                </div>
+            </div>
+            <div class="w-full h-96">
+                <canvas id="vibrationChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Bounds Card -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <h5 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <i class="fas fa-ruler text-purple-600"></i>
+                Vibration Bounds & Period Stats
+            </h5>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border-l-4 border-blue-500 hover:shadow-lg transition">
+                    <p class="text-xs text-gray-600 uppercase font-semibold tracking-wide">Lower Bound</p>
+                    <p class="text-3xl font-bold text-blue-600 mt-3"><span id="lowerBound">--</span></p>
+                    <p class="text-xs text-gray-500 mt-1">mm/s</p>
+                </div>
+                <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-4 border-l-4 border-red-500 hover:shadow-lg transition">
+                    <p class="text-xs text-gray-600 uppercase font-semibold tracking-wide">Upper Bound</p>
+                    <p class="text-3xl font-bold text-red-600 mt-3"><span id="upperBound">--</span></p>
+                    <p class="text-xs text-gray-500 mt-1">mm/s</p>
+                </div>
+                <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border-l-4 border-green-500 hover:shadow-lg transition">
+                    <p class="text-xs text-gray-600 uppercase font-semibold tracking-wide">Min (Period)</p>
+                    <p class="text-3xl font-bold text-green-600 mt-3"><span id="minVibration">--</span></p>
+                    <p class="text-xs text-gray-500 mt-1">mm/s</p>
+                </div>
+                <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border-l-4 border-orange-500 hover:shadow-lg transition">
+                    <p class="text-xs text-gray-600 uppercase font-semibold tracking-wide">Max (Period)</p>
+                    <p class="text-3xl font-bold text-orange-600 mt-3"><span id="maxVibration">--</span></p>
+                    <p class="text-xs text-gray-500 mt-1">mm/s</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clusters Card -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <h5 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <i class="fas fa-braille text-cyan-600"></i>
+                ML Clusters (Training Data)
+            </h5>
+            <div id="clusterContainer" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="flex items-center justify-center h-40 col-span-full text-gray-400">
+                    <p class="text-center"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><br><span>Loading cluster data...</span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Readings Table -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
+            <h5 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <i class="fas fa-list text-indigo-600"></i>
+                Recent Vibration Readings
+            </h5>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
+                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Time</th>
+                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Value</th>
+                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Cluster</th>
+                            <th class="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="readingsTableBody">
+                        <tr><td colspan="4" class="px-6 py-4 text-center text-gray-400"><i class="fas fa-hourglass-end mr-2"></i>Waiting for data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
     <script src="firebase-config.js"></script>
