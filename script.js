@@ -341,7 +341,7 @@ function getClusterBoundsForReading(reading) {
 }
 
 function isReadingAnomaly(reading) {
-    const value = Number(reading?.value);
+    const value = Number(reading && reading.value);
     if (!Number.isFinite(value)) {
         return false;
     }
@@ -411,7 +411,10 @@ function updateDeviceStatus(isOnline) {
 function checkDataStatus() {
     const now = Date.now();
     const latestHistoryTimestamp = fullHistoryData.length > 0 ? fullHistoryData[fullHistoryData.length - 1].timestamp : null;
-    const latestTimestamp = Math.max(lastLiveDataTimestamp ?? 0, latestHistoryTimestamp ?? 0);
+    const latestTimestamp = Math.max(
+        lastLiveDataTimestamp !== null && lastLiveDataTimestamp !== undefined ? lastLiveDataTimestamp : 0,
+        latestHistoryTimestamp !== null && latestHistoryTimestamp !== undefined ? latestHistoryTimestamp : 0
+    );
 
     if (!latestTimestamp) {
         return;
@@ -496,7 +499,10 @@ function renderChart(minuteLimit) {
     vibrationChart.data.datasets[0].pointRadius = pointRadii;
 
     const highestPoint = values.length > 0 ? Math.max(...values) : 0;
-    const suggestedMaximum = Math.max(highestPoint, highestClusterUpper ?? 0);
+    const suggestedMaximum = Math.max(
+        highestPoint,
+        highestClusterUpper !== null && highestClusterUpper !== undefined ? highestClusterUpper : 0
+    );
 
     vibrationChart.options.scales.y.suggestedMax = suggestedMaximum > 0 ? suggestedMaximum * 1.15 : 1;
     vibrationChart.update();
