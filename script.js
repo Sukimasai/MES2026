@@ -60,20 +60,60 @@ let vibrationChart = new Chart(ctx, {
         datasets: [{
             label: 'Avg Vibration (mm/s)',
             data: [],
-            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-            borderColor: 'rgba(59, 130, 246, 1)',
+            backgroundColor: 'rgba(87, 209, 198, 0.16)',
+            borderColor: 'rgba(87, 209, 198, 1)',
             borderWidth: 2,
-            tension: 0.3,
-            fill: true
+            tension: 0.35,
+            fill: true,
+            pointBackgroundColor: 'rgba(87, 209, 198, 1)',
+            pointBorderColor: '#08111d',
+            pointHoverRadius: 7
         }]
     },
     options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+            mode: 'index',
+            intersect: false
+        },
+        plugins: {
+            legend: {
+                labels: {
+                    color: 'rgba(241, 245, 249, 0.75)',
+                    font: {
+                        family: 'IBM Plex Mono'
+                    }
+                }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(8, 17, 29, 0.95)',
+                titleColor: '#f5f7fb',
+                bodyColor: '#d8e1ef',
+                borderColor: 'rgba(87, 209, 198, 0.35)',
+                borderWidth: 1,
+                padding: 12,
+                displayColors: false
+            }
+        },
         scales: {
             y: {
                 beginAtZero: true,
-                title: { display: true, text: 'Vibration (mm/s)' }
+                title: { display: true, text: 'Vibration (mm/s)', color: 'rgba(241, 245, 249, 0.7)' },
+                ticks: {
+                    color: 'rgba(241, 245, 249, 0.66)'
+                },
+                grid: {
+                    color: 'rgba(148, 163, 184, 0.12)'
+                }
+            },
+            x: {
+                ticks: {
+                    color: 'rgba(241, 245, 249, 0.66)'
+                },
+                grid: {
+                    color: 'rgba(148, 163, 184, 0.08)'
+                }
             }
         }
     },
@@ -94,8 +134,8 @@ vibrationRef.on('value', (snapshot) => {
         
         const now = new Date();
         document.getElementById('statusTime').innerText = now.toLocaleTimeString();
-        document.getElementById('currentVibration').classList.remove('text-red-500', 'text-2xl');
-        document.getElementById('currentVibration').classList.add('text-blue-600', 'text-3xl');
+        document.getElementById('currentVibration').classList.remove('vibration-value-offline', 'text-2xl');
+        document.getElementById('currentVibration').classList.add('vibration-value-online', 'text-3xl');
         
         updateDeviceStatus(true);
     }
@@ -295,11 +335,11 @@ function updateLastAnomaly() {
 function updateDeviceStatus(isOnline) {
     const badge = document.getElementById('statusBadge');
     if (isOnline) {
-        badge.className = 'inline-block px-3 py-1 rounded-full text-white bg-green-500 text-sm';
-        badge.innerText = '🟢 Online';
+        badge.className = 'status-pill status-pill-online';
+        badge.innerHTML = '<span class="status-dot"></span><span>Online</span>';
     } else {
-        badge.className = 'inline-block px-3 py-1 rounded-full text-white bg-red-500 text-sm';
-        badge.innerText = '🔴 Offline';
+        badge.className = 'status-pill status-pill-offline';
+        badge.innerHTML = '<span class="status-dot"></span><span>Offline</span>';
     }
 }
 
@@ -313,8 +353,8 @@ function checkDataStatus() {
     if (timeSinceLastData > 3 * 60 * 1000) {
         updateDeviceStatus(false);
         document.getElementById('currentVibration').innerText = "Offline";
-        document.getElementById('currentVibration').classList.remove('text-blue-600', 'text-3xl');
-        document.getElementById('currentVibration').classList.add('text-red-500', 'text-2xl');
+        document.getElementById('currentVibration').classList.remove('vibration-value-online', 'text-3xl');
+        document.getElementById('currentVibration').classList.add('vibration-value-offline', 'text-2xl');
     } else {
         updateDeviceStatus(true);
     }
