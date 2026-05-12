@@ -123,11 +123,16 @@ let vibrationChart = new Chart(ctx, {
 // Cluster storage
 let clusterData = {};
 let recentReadings = [];
+const OFFLINE_TIMEOUT_MS = 3 * 60 * 1000;
+let lastLiveDataTimestamp = null;
+let offlineAlertSent = false;
+let notificationPermissionRequested = false;
 
 const vibrationRef = database.ref('/AverageVibration');
 vibrationRef.on('value', (snapshot) => {
     const data = snapshot.val();
     if (data !== null) {
+        lastLiveDataTimestamp = Date.now();
         const vibValue = parseFloat(data);
         document.getElementById('currentVibration').innerText = vibValue.toFixed(2);
         document.getElementById('lastReading').innerText = vibValue.toFixed(2);
@@ -311,16 +316,76 @@ function getClusterUpperRange() {
     return Math.max(...upperBounds);
 }
 
-function updateLastAnomaly() {
+function getClusterBoundsForReading(reading) {
+    if (reading === null || reading === undefined) {
+        return null;
+    }
+
+    const clusterId = reading.cluster;
+    if (clusterId === null || clusterId === undefined) {
+        return null;
+    }
+
+    const bounds = clusterData[`cluster_${clusterId}`];
+    if (!bounds) {
+        return null;
+    }
+
+    const lower = Number(bounds.lower_bound);
+    const upper = Number(bounds.upper_bound);
+    if (!Number.isFinite(lower) || !Number.isFinite(upper)) {
+        return null;
+    }
+
+    return { lower, upper };
+}
+
+function isReadingAnomaly(reading) {
+    const value = Number(reading?.value);
+    if (!Number.isFinite(value)) {
+        return false;
+    }
+
+    const bounds = getClusterBoundsForReading(reading);
+    if (bounds) {
+        return value < bounds.lower || value > bounds.upper;
+    }
+
     const highestClusterUpper = getClusterUpperRange();
-    if (highestClusterUpper === null) {
-        document.getElementById('lastAnomalyValue').innerText = '--';
-        document.getElementById('lastAnomalyTime').innerText = '--:--:--';
+    return highestClusterUpper !== null && value > highestClusterUpper;
+}
+
+function notifyIfOffline(timeSinceLastDataMs) {
+    if (offlineAlertSent || typeof Notification === 'undefined' || !window.isSecureContext) {
         return;
     }
 
-    // find the most recent reading above the highest cluster upper bound
-    const anomalies = fullHistoryData.filter(d => Number(d.value) > highestClusterUpper);
+    const minutesSilent = Math.floor(timeSinceLastDataMs / 60000);
+    const sendNotification = () => {
+        if (Notification.permission === 'granted' && !offlineAlertSent) {
+            new Notification('Device offline', {
+                body: `No data received for ${minutesSilent} minute(s).`,
+                icon: 'https://cdn-icons-png.flaticon.com/512/565/565547.png'
+            });
+            offlineAlertSent = true;
+        }
+    };
+
+    if (Notification.permission === 'granted') {
+        sendNotification();
+        return;
+    }
+
+    if (Notification.permission === 'default' && !notificationPermissionRequested) {
+        notificationPermissionRequested = true;
+        Notification.requestPermission().then(() => {
+            sendNotification();
+        });
+    }
+}
+
+function updateLastAnomaly() {
+    const anomalies = fullHistoryData.filter(isReadingAnomaly);
     if (anomalies.length === 0) {
         document.getElementById('lastAnomalyValue').innerText = '--';
         document.getElementById('lastAnomalyTime').innerText = '--:--:--';
@@ -344,19 +409,25 @@ function updateDeviceStatus(isOnline) {
 }
 
 function checkDataStatus() {
-    if (fullHistoryData.length === 0) return;
-
     const now = Date.now();
-    const latestPoint = fullHistoryData[fullHistoryData.length - 1];
-    const timeSinceLastData = now - latestPoint.timestamp;
+    const latestHistoryTimestamp = fullHistoryData.length > 0 ? fullHistoryData[fullHistoryData.length - 1].timestamp : null;
+    const latestTimestamp = Math.max(lastLiveDataTimestamp ?? 0, latestHistoryTimestamp ?? 0);
 
-    if (timeSinceLastData > 3 * 60 * 1000) {
+    if (!latestTimestamp) {
+        return;
+    }
+
+    const timeSinceLastData = now - latestTimestamp;
+
+    if (timeSinceLastData > OFFLINE_TIMEOUT_MS) {
         updateDeviceStatus(false);
         document.getElementById('currentVibration').innerText = "Offline";
         document.getElementById('currentVibration').classList.remove('vibration-value-online', 'text-3xl');
         document.getElementById('currentVibration').classList.add('vibration-value-offline', 'text-2xl');
+        notifyIfOffline(timeSinceLastData);
     } else {
         updateDeviceStatus(true);
+        offlineAlertSent = false;
     }
 
     renderChart(currentMinuteLimit);
@@ -410,16 +481,16 @@ function renderChart(minuteLimit) {
     vibrationChart.data.labels = labels;
     vibrationChart.data.datasets[0].data = values;
 
-    // color points red if they exceed the highest cluster upper bound
+    // Color points red when they fall outside their assigned cluster bounds.
     const highestClusterUpper = getClusterUpperRange();
     const defaultPointColor = 'rgba(59,130,246,1)';
     const anomalyPointColor = 'rgba(220,38,38,1)';
 
-    const pointColors = values.map(v => {
-        return (highestClusterUpper !== null && v > highestClusterUpper) ? anomalyPointColor : defaultPointColor;
+    const pointColors = dataToPlot.map(point => {
+        return isReadingAnomaly(point) ? anomalyPointColor : defaultPointColor;
     });
 
-    const pointRadii = values.map(v => (highestClusterUpper !== null && v > highestClusterUpper) ? 6 : 3);
+    const pointRadii = dataToPlot.map(point => isReadingAnomaly(point) ? 6 : 3);
 
     vibrationChart.data.datasets[0].pointBackgroundColor = pointColors;
     vibrationChart.data.datasets[0].pointRadius = pointRadii;
